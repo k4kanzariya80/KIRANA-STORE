@@ -217,7 +217,13 @@
             if (currentBill[code]) {
                 currentBill[code].qty += 1;
             } else {
-                currentBill[code] = { name: products[code].name, price: Number(products[code].price), qty: 1 };
+                currentBill[code] = {
+                    cat: products[code].cat,
+                    sub: products[code].sub,
+                    name: products[code].name,
+                    price: Number(products[code].price),
+                    qty: 1
+                };
             }
             renderBill();
         } else {
@@ -246,7 +252,7 @@
             list.innerHTML += `
                 <div class="bill-item">
                     <div class="item-info">
-                        <div class="item-name">${item.name}</div>
+                        <div class="item-name">${item.cat} > ${item.sub} - ${item.name}</div>
                         <div class="item-price">₹${item.price} / nang</div>
                     </div>
                     <div class="qty-controls">
