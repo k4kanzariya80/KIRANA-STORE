@@ -1,190 +1,227 @@
-
 <!DOCTYPE html>
 <html lang="gu">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>કરિયાણા બિલિંગ એપ</title>
+    <title>Kariyana POS</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         * { box-sizing: border-box; font-family: sans-serif; }
-        body { margin: 0; padding: 0; background: #f4f6f9; padding-bottom: 130px; }
+        body { margin: 0; padding: 0; background: #f4f6f9; padding-bottom: 140px; }
         .header { background: #1b5e20; color: white; padding: 12px; text-align: center; font-size: 22px; font-weight: bold; }
         .tabs { display: flex; background: #2e7d32; }
-        .tab { flex: 1; padding: 14px; text-align: center; color: white; font-size: 18px; font-weight: bold; cursor: pointer; border-bottom: 4px solid transparent; }
+        .tab { flex: 1; padding: 14px; text-align: center; color: white; font-size: 16px; font-weight: bold; cursor: pointer; border-bottom: 4px solid transparent; }
         .tab.active { background: #1b5e20; border-bottom: 4px solid #ffeb3b; color: #ffeb3b; }
         .section { display: none; padding: 12px; }
         .section.active { display: block; }
         
-        #reader { width: 100%; max-width: 400px; margin: 0 auto; border-radius: 10px; overflow: hidden; background: #000; }
+        /* Scanner */
+        #reader-container { display: none; margin-bottom: 15px; }
+        #reader { width: 100%; border-radius: 8px; overflow: hidden; }
+        .btn-scan { background: #0277bd; color: white; padding: 12px; font-size: 18px; border: none; border-radius: 8px; width: 100%; font-weight: bold; margin-bottom: 10px; cursor: pointer; }
+
+        /* Grid Navigation */
+        .nav-bar { display: flex; align-items: center; margin-bottom: 10px; background: #e0e0e0; padding: 8px; border-radius: 8px; font-weight: bold; font-size: 16px; }
+        .btn-back { background: #d32f2f; color: white; border: none; padding: 6px 12px; border-radius: 5px; margin-right: 10px; font-size: 16px; cursor: pointer; }
         
-        /* બિલ લિસ્ટ અને મોટા અક્ષરો */
-        .bill-item { background: white; padding: 12px; margin: 8px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px; }
+        .grid-item { background: white; border: 2px solid #1b5e20; border-radius: 8px; padding: 15px 5px; text-align: center; font-weight: bold; font-size: 14px; color: #1b5e20; cursor: pointer; display: flex; flex-direction: column; justify-content: center; min-height: 80px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .grid-item.product { background: #e8f5e9; border-color: #2e7d32; }
+        .product-price { color: #d32f2f; font-size: 16px; margin-top: 5px; }
+
+        /* Bill List */
+        .bill-header { font-size: 18px; font-weight: bold; color: #333; margin-bottom: 10px; border-bottom: 2px solid #ccc; padding-bottom: 5px; }
+        .bill-item { background: white; padding: 10px; margin: 6px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .item-info { flex: 1; }
-        .item-name { font-size: 20px; font-weight: bold; color: #222; }
-        .item-price { font-size: 16px; color: #555; margin-top: 4px; }
-        .qty-controls { display: flex; align-items: center; gap: 8px; }
-        .btn-qty { width: 42px; height: 42px; font-size: 24px; font-weight: bold; border: none; border-radius: 8px; background: #e0e0e0; cursor: pointer; }
+        .item-name { font-size: 16px; font-weight: bold; color: #222; }
+        .item-price { font-size: 14px; color: #555; }
+        .qty-controls { display: flex; align-items: center; gap: 6px; }
+        .btn-qty { width: 36px; height: 36px; font-size: 20px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; }
         .btn-qty.plus { background: #c8e6c9; color: #1b5e20; }
         .btn-qty.minus { background: #ffcdd2; color: #b71c1c; }
-        .qty-num { font-size: 22px; font-weight: bold; min-width: 28px; text-align: center; }
-        .item-total { font-size: 22px; font-weight: bold; color: #1b5e20; min-width: 75px; text-align: right; }
+        .qty-num { font-size: 18px; font-weight: bold; min-width: 20px; text-align: center; }
+        .item-total { font-size: 18px; font-weight: bold; color: #1b5e20; min-width: 65px; text-align: right; }
 
-        /* નીચેનું ટોટલ બાર */
-        .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 12px 16px; box-shadow: 0 -3px 10px rgba(0,0,0,0.2); display: flex; justify-content: space-between; align-items: center; border-top: 3px solid #1b5e20; z-index: 100; }
-        .total-box { line-height: 1.3; }
-        .total-items { font-size: 18px; color: #444; font-weight: bold; }
-        .total-amount { font-size: 30px; font-weight: bold; color: #d32f2f; }
-        .btn-clear { background: #d32f2f; color: white; border: none; padding: 14px 20px; font-size: 18px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        /* Bottom Bar */
+        .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 12px; box-shadow: 0 -3px 10px rgba(0,0,0,0.2); display: flex; justify-content: space-between; align-items: center; border-top: 3px solid #1b5e20; z-index: 100; }
+        .total-items { font-size: 16px; color: #444; font-weight: bold; }
+        .total-amount { font-size: 26px; font-weight: bold; color: #d32f2f; }
+        .btn-clear { background: #d32f2f; color: white; border: none; padding: 12px 15px; font-size: 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-        /* ફોર્મ અને બટન્સ */
-        input { width: 100%; padding: 14px; margin: 8px 0 16px 0; font-size: 18px; border: 2px solid #ccc; border-radius: 8px; }
-        label { font-size: 18px; font-weight: bold; color: #333; }
-        .btn-main { width: 100%; padding: 15px; background: #1b5e20; color: white; font-size: 20px; border: none; border-radius: 8px; font-weight: bold; margin-top: 8px; cursor: pointer; }
-        .quick-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-        .btn-quick { background: #fff; border: 2px solid #1b5e20; color: #1b5e20; padding: 10px 14px; font-size: 18px; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .status-msg { text-align: center; padding: 10px; font-size: 18px; font-weight: bold; border-radius: 8px; margin: 8px 0; display: none; }
+        /* Settings Form */
+        input, select { width: 100%; padding: 12px; margin: 6px 0 12px 0; font-size: 16px; border: 2px solid #ccc; border-radius: 8px; }
+        label { font-size: 14px; font-weight: bold; color: #333; }
+        .btn-save { width: 100%; padding: 14px; background: #2e7d32; color: white; font-size: 18px; border: none; border-radius: 8px; font-weight: bold; margin-top: 5px; cursor: pointer; }
+        .setting-list-item { background: white; padding: 10px; margin-bottom: 8px; border-radius: 6px; border: 1px solid #ddd; }
+        .setting-del-btn { background: #d32f2f; color: white; padding: 6px 12px; border: none; border-radius: 4px; float: right; font-weight: bold; margin-top: -5px; }
     </style>
 </head>
 <body>
 
-<div class="header">🛒 કરિયાણા બિલિંગ એપ</div>
+<div class="header">🛒 Karirana POS</div>
 
 <div class="tabs">
-    <div class="tab active" onclick="switchTab('bill')">૧. બિલ બનાવો</div>
-    <div class="tab" onclick="switchTab('add')">૨. વસ્તુ ઉમેરો / ભાવ</div>
+    <div class="tab active" onclick="switchTab('bill')">1. Bill Banavo</div>
+    <div class="tab" onclick="switchTab('settings')">2. Settings (Update)</div>
 </div>
 
-<!-- વિભાગ ૧: બિલ બનાવવા માટે -->
+<!-- SECTION 1: BILLING -->
 <div id="bill-section" class="section active">
-    <div id="reader"></div>
-    <div id="scan-status" class="status-msg"></div>
+    
+    <button class="btn-scan" id="scan-toggle-btn" onclick="toggleScanner()">📷 Barcode Scan Karo</button>
+    <div id="reader-container"><div id="reader"></div></div>
 
-    <div style="margin-top: 12px; font-weight: bold; font-size: 17px; color: #444;">છૂટક વસ્તુઓ (ટચ કરીને ઉમેરો):</div>
-    <div id="quick-list" class="quick-buttons"></div>
+    <div class="nav-bar" id="nav-bar" style="display: none;">
+        <button class="btn-back" onclick="goBack()">🔙 Back</button>
+        <span id="nav-title">Home</span>
+    </div>
 
-    <hr style="border: 1px solid #ddd;">
+    <div id="grid-container" class="grid-container">
+        <!-- Categories/Products will load here -->
+    </div>
+
+    <div class="bill-header">Chalu Bill:</div>
     <div id="bill-list"></div>
 </div>
 
-<!-- વિભાગ ૨: નવી વસ્તુ અને ભાવ સેવ કરવા -->
-<div id="add-section" class="section">
-    <button class="btn-main" style="background:#0277bd; margin-bottom: 15px;" onclick="scanForAdd()">📷 બારકોડ સ્કેન કરો</button>
-    
-    <label>બારકોડ નંબર (અથવા છૂટક માટે ખાલી રાખો):</label>
-    <input type="text" id="prod-code" placeholder="સ્કેન કરો અથવા કોડ લખો">
+<!-- SECTION 2: SETTINGS (ADD/EDIT ITEMS) -->
+<div id="settings-section" class="section">
+    <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h3 style="margin-top: 0;">Navi Vastu Umero / Bhav Badlo</h3>
+        
+        <label>Barcode (Scan karva mate, loose item mate khali rakho):</label>
+        <input type="text" id="set-code" placeholder="Barcode number">
+        
+        <label>Category (Main Name - e.g. Balaji, Loose Item):</label>
+        <input type="text" id="set-cat" placeholder="Category lakho">
+        
+        <label>Sub Category (e.g. Wafers, Khand):</label>
+        <input type="text" id="set-sub" placeholder="Sub-category lakho">
+        
+        <label>Vastu Nu Naam + Vajan/Rupee (e.g. Mori Wafers ₹5):</label>
+        <input type="text" id="set-name" placeholder="Puru naam lakho">
+        
+        <label>Price (₹):</label>
+        <input type="number" id="set-price" placeholder="Bhav lakho">
+        
+        <button class="btn-save" onclick="saveItem()">💾 Save Vastu</button>
+    </div>
 
-    <label>વસ્તુનું નામ (દા.ત. ખાંડ 1 kg, બાલાજી વેફર):</label>
-    <input type="text" id="prod-name" placeholder="વસ્તુનું નામ લખો">
-
-    <label>ભાવ (રૂપિયામાં):</label>
-    <input type="number" id="prod-price" placeholder="દા.ત. 45">
-
-    <button class="btn-main" onclick="saveProduct()">✅ વસ્તુ સેવ કરો</button>
-
-    <h3 style="margin-top: 25px;">સેવ કરેલી વસ્તુઓનું લિસ્ટ:</h3>
-    <div id="saved-products-list"></div>
+    <h3 style="margin-top: 20px;">Save Kareli Vastu List:</h3>
+    <div id="settings-items-list"></div>
 </div>
 
-<!-- નીચેનું કુલ ટોટલ બાર -->
 <div class="bottom-bar" id="bottom-bar">
-    <div class="total-box">
-        <div class="total-items">કુલ વસ્તુ: <span id="total-qty">0</span></div>
+    <div>
+        <div class="total-items">Kull Vastu: <span id="total-qty">0</span></div>
         <div class="total-amount">₹ <span id="total-price">0</span></div>
     </div>
-    <button class="btn-clear" onclick="clearBill()">નવું બિલ 🔄</button>
+    <button class="btn-clear" onclick="clearBill()">Navu Bill 🔄</button>
 </div>
 
 <script>
-    // શરૂઆતના ડેમો ભાવ (તમે ડિલીટ કે બદલી શકો છો)
-    let defaultProducts = {
-        "LOOSE_SUGAR_1KG": { name: "ખાંડ 1 કિલો", price: 44, isLoose: true },
-        "LOOSE_SUGAR_500G": { name: "ખાંડ 500 ગ્રામ", price: 22, isLoose: true },
-        "LOOSE_OIL_1L": { name: "તેલ 1 લિટર", price: 140, isLoose: true }
+    let defaultDb = {
+        "b_m_5": { cat: "Balaji", sub: "Wafers", name: "Mori Wafers ₹5", price: 5 },
+        "b_m_10": { cat: "Balaji", sub: "Wafers", name: "Mori Wafers ₹10", price: 10 },
+        "b_t_5": { cat: "Balaji", sub: "Wafers", name: "Tikhi Wafers ₹5", price: 5 },
+        "b_c_10": { cat: "Balaji", sub: "Others", name: "Chevdo ₹10", price: 10 },
+        "g_w_5": { cat: "Gopal", sub: "Wafers", name: "Masala Wafers ₹5", price: 5 },
+        "c_t_250": { cat: "Colddrinks", sub: "ThumsUp", name: "ThumsUp 250ml", price: 20 },
+        "c_s_250": { cat: "Colddrinks", sub: "Sprite", name: "Sprite 250ml", price: 20 },
+        "l_k_1": { cat: "Loose Kariyanu", sub: "Khand", name: "Khand 1 kg", price: 42 },
+        "l_k_500": { cat: "Loose Kariyanu", sub: "Khand", name: "Khand 500g", price: 21 },
+        "l_t_1": { cat: "Loose Kariyanu", sub: "Tel (Oil)", name: "Cing Tel 1 Ltr", price: 140 }
     };
 
-    let products = JSON.parse(localStorage.getItem('kariyana_products')) || defaultProducts;
+    let products = JSON.parse(localStorage.getItem('pos_products')) || defaultDb;
     let currentBill = {};
+    
+    // Navigation State
+    let currentCat = null;
+    let currentSub = null;
+
     let html5QrCode;
-    let scanMode = 'bill';
+    let isScannerOn = false;
     let isScanningPaused = false;
 
-    // બીપ અવાજ કરવા માટે
+    // --- NAVIGATION LOGIC (TOUCH UI) ---
+    function renderGrid() {
+        const grid = document.getElementById('grid-container');
+        const navBar = document.getElementById('nav-bar');
+        const navTitle = document.getElementById('nav-title');
+        grid.innerHTML = '';
+
+        let items = Object.values(products);
+
+        if (!currentCat) {
+            // Level 1: Show Categories
+            navBar.style.display = 'none';
+            let categories = [...new Set(items.map(p => p.cat))];
+            categories.forEach(cat => {
+                grid.innerHTML += `<div class="grid-item" onclick="goCategory('${cat}')">${cat}</div>`;
+            });
+        } else if (!currentSub) {
+            // Level 2: Show Sub Categories
+            navBar.style.display = 'flex';
+            navTitle.innerText = currentCat;
+            let subCats = [...new Set(items.filter(p => p.cat === currentCat).map(p => p.sub))];
+            subCats.forEach(sub => {
+                grid.innerHTML += `<div class="grid-item" onclick="goSubCategory('${sub}')">${sub}</div>`;
+            });
+        } else {
+            // Level 3: Show Products
+            navBar.style.display = 'flex';
+            navTitle.innerText = `${currentCat} > ${currentSub}`;
+            let prods = Object.keys(products).filter(k => products[k].cat === currentCat && products[k].sub === currentSub);
+            prods.forEach(key => {
+                let p = products[key];
+                grid.innerHTML += `
+                    <div class="grid-item product" onclick="addToBill('${key}')">
+                        ${p.name}
+                        <div class="product-price">₹${p.price}</div>
+                    </div>`;
+            });
+        }
+    }
+
+    function goCategory(cat) { currentCat = cat; renderGrid(); }
+    function goSubCategory(sub) { currentSub = sub; renderGrid(); }
+    function goBack() {
+        if (currentSub) { currentSub = null; }
+        else if (currentCat) { currentCat = null; }
+        renderGrid();
+    }
+
+    // --- BILLING LOGIC ---
     function playBeep() {
         try {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
             const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.frequency.value = 1000;
+            osc.connect(ctx.destination);
+            osc.frequency.value = 800;
             osc.type = "sine";
-            osc.start();
-            setTimeout(() => osc.stop(), 150);
+            osc.start(); setTimeout(() => osc.stop(), 100);
         } catch(e) {}
-    }
-
-    function showStatus(msg, color) {
-        const el = document.getElementById('scan-status');
-        el.style.display = 'block';
-        el.style.background = color;
-        el.style.color = '#fff';
-        el.innerText = msg;
-        setTimeout(() => { el.style.display = 'none'; }, 2000);
-    }
-
-    function startScanner() {
-        if (!html5QrCode) {
-            html5QrCode = new Html5Qrcode("reader");
-        }
-        html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 250, height: 150 } },
-            (decodedText) => {
-                if (isScanningPaused) return;
-                
-                playBeep();
-                isScanningPaused = true;
-                setTimeout(() => { isScanningPaused = false; }, 1800); // 1.8 સેકન્ડનો પોઝ જેથી બે વાર સ્કેન ન થઈ જાય
-
-                if (scanMode === 'bill') {
-                    addToBill(decodedText);
-                } else if (scanMode === 'add') {
-                    document.getElementById('prod-code').value = decodedText;
-                    switchTab('add', true);
-                    alert("બારકોડ આવી ગયો: " + decodedText + "\nહવે વસ્તુનું નામ અને ભાવ લખો.");
-                }
-            },
-            (errorMessage) => {}
-        ).catch(err => {
-            console.log("કેમેરા ચાલુ કરવામાં સમસ્યા:", err);
-        });
     }
 
     function addToBill(code) {
         if (products[code]) {
+            playBeep();
             if (currentBill[code]) {
                 currentBill[code].qty += 1;
             } else {
-                currentBill[code] = {
-                    name: products[code].name,
-                    price: Number(products[code].price),
-                    qty: 1
-                };
+                currentBill[code] = { name: products[code].name, price: Number(products[code].price), qty: 1 };
             }
-            showStatus("✅ " + products[code].name + " (₹" + products[code].price + ")", "#2e7d32");
             renderBill();
         } else {
-            showStatus("❌ આ બારકોડ સેવ નથી! પહેલા 'વસ્તુ ઉમેરો' માં સેવ કરો.", "#c62828");
+            alert("Aa barcode maliyo nathi! Settings ma jaine umero.");
         }
     }
 
     function changeQty(code, delta) {
         if (currentBill[code]) {
             currentBill[code].qty += delta;
-            if (currentBill[code].qty <= 0) {
-                delete currentBill[code];
-            }
+            if (currentBill[code].qty <= 0) delete currentBill[code];
             renderBill();
         }
     }
@@ -192,20 +229,18 @@
     function renderBill() {
         const list = document.getElementById('bill-list');
         list.innerHTML = '';
-        let totalQty = 0;
-        let totalPrice = 0;
+        let tQty = 0, tPrice = 0;
 
         for (let code in currentBill) {
             let item = currentBill[code];
             let itemTotal = item.qty * item.price;
-            totalQty += item.qty;
-            totalPrice += itemTotal;
+            tQty += item.qty; tPrice += itemTotal;
 
             list.innerHTML += `
                 <div class="bill-item">
                     <div class="item-info">
                         <div class="item-name">${item.name}</div>
-                        <div class="item-price">ભાવ: ₹${item.price}</div>
+                        <div class="item-price">₹${item.price} / nang</div>
                     </div>
                     <div class="qty-controls">
                         <button class="btn-qty minus" onclick="changeQty('${code}', -1)">-</button>
@@ -213,113 +248,120 @@
                         <button class="btn-qty plus" onclick="changeQty('${code}', 1)">+</button>
                     </div>
                     <div class="item-total">₹${itemTotal}</div>
-                </div>
-            `;
+                </div>`;
         }
-
-        document.getElementById('total-qty').innerText = totalQty;
-        document.getElementById('total-price').innerText = totalPrice;
+        document.getElementById('total-qty').innerText = tQty;
+        document.getElementById('total-price').innerText = tPrice;
     }
 
     function clearBill() {
-        if (Object.keys(currentBill).length === 0) return;
-        if (confirm("શું તમારે આ બિલ ભૂંસીને નવું બિલ શરૂ કરવું છે?")) {
+        if (Object.keys(currentBill).length > 0 && confirm("Navu bill banavvu che? Juno hisab bhusai jashe.")) {
             currentBill = {};
             renderBill();
+            currentCat = null; currentSub = null; renderGrid(); // go to home
         }
     }
 
-    function saveProduct() {
-        let code = document.getElementById('prod-code').value.trim();
-        let name = document.getElementById('prod-name').value.trim();
-        let price = document.getElementById('prod-price').value.trim();
-
-        if (!name || !price) {
-            alert("કૃપા કરીને વસ્તુનું નામ અને ભાવ બંને લખો!");
-            return;
+    // --- SCANNER LOGIC ---
+    function toggleScanner() {
+        const container = document.getElementById('reader-container');
+        const btn = document.getElementById('scan-toggle-btn');
+        
+        if (isScannerOn) {
+            html5QrCode.stop().then(() => {
+                container.style.display = 'none';
+                btn.innerText = "📷 Barcode Scan Karo";
+                btn.style.background = "#0277bd";
+                isScannerOn = false;
+            });
+        } else {
+            container.style.display = 'block';
+            btn.innerText = "❌ Scanner Bandh Karo";
+            btn.style.background = "#d32f2f";
+            
+            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, 
+                (decodedText) => {
+                    if (isScanningPaused) return;
+                    isScanningPaused = true;
+                    setTimeout(() => { isScanningPaused = false; }, 1500); // 1.5s delay prevent double scan
+                    addToBill(decodedText);
+                }, (err) => {}
+            ).then(() => { isScannerOn = true; }).catch(err => {
+                alert("Camera ni permission aapo!");
+                container.style.display = 'none';
+                btn.innerText = "📷 Barcode Scan Karo";
+            });
         }
-
-        let isLoose = false;
-        if (!code) {
-            code = "LOOSE_" + Date.now();
-            isLoose = true;
-        }
-
-        products[code] = { name: name, price: Number(price), isLoose: isLoose };
-        localStorage.setItem('kariyana_products', JSON.stringify(products));
-
-        document.getElementById('prod-code').value = '';
-        document.getElementById('prod-name').value = '';
-        document.getElementById('prod-price').value = '';
-
-        alert("✅ " + name + " (₹" + price + ") સેવ થઈ ગઈ!");
-        renderSavedProducts();
-        renderQuickButtons();
     }
 
-    function deleteProduct(code) {
-        if (confirm("શું આ વસ્તુ કાઢી નાખવી છે?")) {
+    // --- SETTINGS / ADMIN LOGIC ---
+    function saveItem() {
+        let code = document.getElementById('set-code').value.trim() || ("ITEM_" + Date.now());
+        let cat = document.getElementById('set-cat').value.trim();
+        let sub = document.getElementById('set-sub').value.trim();
+        let name = document.getElementById('set-name').value.trim();
+        let price = document.getElementById('set-price').value.trim();
+
+        if (!cat || !sub || !name || !price) {
+            alert("Bari vigato bharo! (Category, Sub-cat, Name, Price)"); return;
+        }
+
+        products[code] = { cat, sub, name, price: Number(price) };
+        localStorage.setItem('pos_products', JSON.stringify(products));
+        
+        document.getElementById('set-code').value = '';
+        document.getElementById('set-name').value = '';
+        document.getElementById('set-price').value = '';
+        
+        alert("✅ Vastu Save Thai Gai!");
+        renderSettingsList();
+        renderGrid();
+    }
+
+    function deleteItem(code) {
+        if (confirm("Aa vastu kadi nakhvi che?")) {
             delete products[code];
-            localStorage.setItem('kariyana_products', JSON.stringify(products));
-            renderSavedProducts();
-            renderQuickButtons();
+            localStorage.setItem('pos_products', JSON.stringify(products));
+            renderSettingsList();
+            renderGrid();
         }
     }
 
-    function renderQuickButtons() {
-        const qList = document.getElementById('quick-list');
-        qList.innerHTML = '';
+    function renderSettingsList() {
+        const list = document.getElementById('settings-items-list');
+        list.innerHTML = '';
         for (let code in products) {
-            if (products[code].isLoose) {
-                qList.innerHTML += `<button class="btn-quick" onclick="addToBill('${code}')">+ ${products[code].name} (₹${products[code].price})</button>`;
-            }
+            let p = products[code];
+            list.innerHTML += `
+                <div class="setting-list-item">
+                    <button class="setting-del-btn" onclick="deleteItem('${code}')">Delete</button>
+                    <strong>${p.name}</strong> - ₹${p.price}<br>
+                    <small style="color:gray;">${p.cat} > ${p.sub} | Code: ${code}</small>
+                </div>`;
         }
     }
 
-    function renderSavedProducts() {
-        const sList = document.getElementById('saved-products-list');
-        sList.innerHTML = '';
-        for (let code in products) {
-            sList.innerHTML += `
-                <div class="bill-item">
-                    <div class="item-info">
-                        <div class="item-name">${products[code].name} - ₹${products[code].price}</div>
-                        <div class="item-price">કોડ: ${code}</div>
-                    </div>
-                    <button class="btn-qty minus" style="width:auto; padding:0 12px; font-size:16px;" onclick="deleteProduct('${code}')">ડિલીટ</button>
-                </div>
-            `;
-        }
-    }
-
-    function switchTab(tab, keepCode = false) {
+    function switchTab(tab) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-
+        
         if (tab === 'bill') {
-            scanMode = 'bill';
             document.querySelectorAll('.tab')[0].classList.add('active');
             document.getElementById('bill-section').classList.add('active');
             document.getElementById('bottom-bar').style.display = 'flex';
         } else {
             document.querySelectorAll('.tab')[1].classList.add('active');
-            document.getElementById('add-section').classList.add('active');
+            document.getElementById('settings-section').classList.add('active');
             document.getElementById('bottom-bar').style.display = 'none';
-            renderSavedProducts();
+            renderSettingsList();
+            if (isScannerOn) toggleScanner(); // Turn off scanner when entering settings
         }
     }
 
-    function scanForAdd() {
-        scanMode = 'add';
-        switchTab('bill');
-        showStatus("હવે નવી વસ્તુનો બારકોડ કેમેરા સામે રાખો...", "#0277bd");
-    }
-
     window.onload = () => {
-        renderQuickButtons();
-        startScanner();
+        renderGrid();
     };
 </script>
-
 </body>
 </html>
