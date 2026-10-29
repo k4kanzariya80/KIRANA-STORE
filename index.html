@@ -52,6 +52,9 @@
         input, select { width: 100%; padding: 12px; margin: 6px 0 12px 0; font-size: 16px; border: 2px solid #ccc; border-radius: 8px; }
         label { font-size: 14px; font-weight: bold; color: #333; }
         .btn-save { width: 100%; padding: 14px; background: #2e7d32; color: white; font-size: 18px; border: none; border-radius: 8px; font-weight: bold; margin-top: 5px; cursor: pointer; }
+        .settings-company-folder { margin-bottom: 10px; background: white; border: 1px solid #c8d6c9; border-radius: 8px; overflow: hidden; }
+        .settings-company-folder > summary { padding: 14px; background: #e8f5e9; color: #1b5e20; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .settings-company-items { padding: 8px; }
         .setting-list-item { background: white; padding: 10px; margin-bottom: 8px; border-radius: 6px; border: 1px solid #ddd; }
         .setting-action-btn { color: white; padding: 6px 10px; border: none; border-radius: 4px; float: right; font-weight: bold; margin-left: 5px; margin-top: -5px; cursor: pointer; }
         .btn-del { background: #d32f2f; }
@@ -111,7 +114,7 @@
         <button class="btn-save" onclick="saveItem()">💾 Save / Update Vastu</button>
     </div>
 
-    <h3 style="margin-top: 20px;">Save Kareli Vastu List:</h3>
+    <h3 style="margin-top: 20px;">Company / Category Pramane Save Kareli Vastu:</h3>
     <div id="settings-items-list"></div>
 </div>
 
@@ -149,6 +152,7 @@
     let isScanningPaused = false;
     let settingsHtml5QrCode;
     let isSettingsScannerOn = false;
+    let openSettingsCompanies = new Set();
 
     // --- NAVIGATION LOGIC (TOUCH UI) ---
     function renderGrid() {
@@ -353,6 +357,7 @@
 
         products[code] = { cat, sub, name, price: Number(price) };
         localStorage.setItem('pos_products', JSON.stringify(products));
+        openSettingsCompanies.add(cat);
         
         document.getElementById('set-code').value = '';
         document.getElementById('set-cat').value = '';
@@ -388,16 +393,61 @@
 
     function renderSettingsList() {
         const list = document.getElementById('settings-items-list');
-        list.innerHTML = '';
+        list.querySelectorAll('.settings-company-folder[open]').forEach(folder => {
+            openSettingsCompanies.add(folder.dataset.company);
+        });
+        list.replaceChildren();
+
+        const companies = new Map();
         for (let code in products) {
-            let p = products[code];
-            list.innerHTML += `
-                <div class="setting-list-item">
-                    <button class="setting-action-btn btn-del" onclick="deleteItem('${code}')">Delete</button>
-                    <button class="setting-action-btn btn-edit" onclick="editItem('${code}')">Edit</button>
-                    <strong>${p.name}</strong> - ₹${p.price}<br>
-                    <small style="color:gray;">${p.cat} > ${p.sub} | Code: ${code}</small>
-                </div>`;
+            const product = products[code];
+            const company = product.cat || 'Other';
+            if (!companies.has(company)) companies.set(company, []);
+            companies.get(company).push({ code, product });
+        }
+
+        for (const [company, items] of companies) {
+            const folder = document.createElement('details');
+            folder.className = 'settings-company-folder';
+            folder.dataset.company = company;
+            folder.open = openSettingsCompanies.has(company);
+
+            const heading = document.createElement('summary');
+            heading.textContent = `📁 ${company} (${items.length})`;
+            folder.append(heading);
+
+            const itemList = document.createElement('div');
+            itemList.className = 'settings-company-items';
+            for (const { code, product } of items) {
+                const item = document.createElement('div');
+                item.className = 'setting-list-item';
+
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'setting-action-btn btn-del';
+                deleteButton.textContent = 'Delete';
+                deleteButton.addEventListener('click', () => deleteItem(code));
+
+                const editButton = document.createElement('button');
+                editButton.className = 'setting-action-btn btn-edit';
+                editButton.textContent = 'Edit';
+                editButton.addEventListener('click', () => editItem(code));
+
+                const name = document.createElement('strong');
+                name.textContent = `${product.cat} > ${product.sub} - ${product.name}`;
+                const details = document.createElement('small');
+                details.style.color = 'gray';
+                details.textContent = `Code: ${code}`;
+
+                item.append(deleteButton, editButton, name, document.createTextNode(` - ₹${product.price}`), document.createElement('br'), details);
+                itemList.append(item);
+            }
+
+            folder.append(itemList);
+            folder.addEventListener('toggle', () => {
+                if (folder.open) openSettingsCompanies.add(company);
+                else openSettingsCompanies.delete(company);
+            });
+            list.append(folder);
         }
     }
 
