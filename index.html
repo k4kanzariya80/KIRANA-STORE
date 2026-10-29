@@ -100,10 +100,16 @@
         <div id="settings-reader-container"><div id="settings-reader"></div></div>
         
         <label>Category (Main Name - e.g. Balaji, Loose Item):</label>
-        <input type="text" id="set-cat" placeholder="Category lakho (manual lakho)">
+        <select id="set-cat-select" onchange="handleCategorySelection()">
+            <option value="">Category pasand karo</option>
+        </select>
+        <input type="text" id="set-cat-new" placeholder="Navi category lakho" style="display: none;" oninput="refreshNewCategorySubcategories()">
         
         <label>Sub Category (e.g. Wafers, Khand):</label>
-        <input type="text" id="set-sub" placeholder="Sub-category lakho (manual lakho)">
+        <select id="set-sub-select" onchange="handleSubcategorySelection()">
+            <option value="">Pehla category pasand karo</option>
+        </select>
+        <input type="text" id="set-sub-new" placeholder="Navi sub-category lakho" style="display: none;">
         
         <label>Vastu Nu Naam + Vajan/Rupee (e.g. Mori Wafers ₹5):</label>
         <input type="text" id="set-name" placeholder="Puru naam lakho">
@@ -153,6 +159,7 @@
     let settingsHtml5QrCode;
     let isSettingsScannerOn = false;
     let openSettingsCompanies = new Set();
+    const addNewOption = '__add_new__';
 
     // --- NAVIGATION LOGIC (TOUCH UI) ---
     function renderGrid() {
@@ -350,10 +357,108 @@
     }
 
     // --- SETTINGS / ADMIN LOGIC ---
+    function getUniqueValues(values) {
+        const uniqueValues = new Map();
+        values.forEach(value => {
+            const trimmedValue = value.trim();
+            if (trimmedValue && !uniqueValues.has(trimmedValue.toLocaleLowerCase())) {
+                uniqueValues.set(trimmedValue.toLocaleLowerCase(), trimmedValue);
+            }
+        });
+        return [...uniqueValues.values()];
+    }
+
+    function populateCategoryOptions(selectedCategory = '') {
+        const select = document.getElementById('set-cat-select');
+        select.replaceChildren(new Option('Category pasand karo', ''));
+        getUniqueValues(Object.values(products).map(product => product.cat || '')).forEach(category => {
+            select.add(new Option(category, category));
+        });
+        select.add(new Option('➕ Add New Category', addNewOption));
+        select.value = selectedCategory;
+        handleCategorySelection();
+    }
+
+    function populateSubcategoryOptions(category, selectedSubcategory = '') {
+        const select = document.getElementById('set-sub-select');
+        select.replaceChildren(new Option(category ? 'Sub-category pasand karo' : 'Pehla category pasand karo', ''));
+        const subcategories = Object.values(products)
+            .filter(product => product.cat === category)
+            .map(product => product.sub || '');
+        getUniqueValues(subcategories).forEach(subcategory => {
+            select.add(new Option(subcategory, subcategory));
+        });
+        select.add(new Option('➕ Add New Sub-category', addNewOption));
+        select.value = selectedSubcategory;
+        handleSubcategorySelection();
+    }
+
+    function handleCategorySelection() {
+        const select = document.getElementById('set-cat-select');
+        const newCategory = document.getElementById('set-cat-new');
+        const isNewCategory = select.value === addNewOption;
+        newCategory.style.display = isNewCategory ? 'block' : 'none';
+        if (!isNewCategory) newCategory.value = '';
+
+        const selectedSubcategory = document.getElementById('set-sub-select').value;
+        const currentSubcategory = selectedSubcategory === addNewOption
+            ? document.getElementById('set-sub-new').value
+            : selectedSubcategory;
+        populateSubcategoryOptions(isNewCategory ? newCategory.value.trim() : select.value);
+        if (currentSubcategory) {
+            const subcategorySelect = document.getElementById('set-sub-select');
+            subcategorySelect.value = currentSubcategory;
+            if (subcategorySelect.value !== currentSubcategory) {
+                subcategorySelect.value = addNewOption;
+                document.getElementById('set-sub-new').value = currentSubcategory;
+                handleSubcategorySelection();
+            }
+        }
+    }
+
+    function handleSubcategorySelection() {
+        const select = document.getElementById('set-sub-select');
+        const newSubcategory = document.getElementById('set-sub-new');
+        const isNewSubcategory = select.value === addNewOption;
+        newSubcategory.style.display = isNewSubcategory ? 'block' : 'none';
+        if (!isNewSubcategory) newSubcategory.value = '';
+    }
+
+    function refreshNewCategorySubcategories() {
+        const categoryInput = document.getElementById('set-cat-new');
+        const categoryName = categoryInput.value.trim();
+        const existingCategory = getUniqueValues(Object.values(products).map(product => product.cat || ''))
+            .find(category => category.toLocaleLowerCase() === categoryName.toLocaleLowerCase());
+        populateSubcategoryOptions(existingCategory || categoryName);
+    }
+
+    function getSelectedCategory() {
+        const select = document.getElementById('set-cat-select');
+        const value = select.value === addNewOption
+            ? document.getElementById('set-cat-new').value.trim()
+            : select.value;
+        return getUniqueValues([...Object.values(products).map(product => product.cat || ''), value]).find(
+            category => category.toLocaleLowerCase() === value.toLocaleLowerCase()
+        ) || value;
+    }
+
+    function getSelectedSubcategory(category) {
+        const select = document.getElementById('set-sub-select');
+        const value = select.value === addNewOption
+            ? document.getElementById('set-sub-new').value.trim()
+            : select.value;
+        const existingSubcategories = Object.values(products)
+            .filter(product => product.cat === category)
+            .map(product => product.sub || '');
+        return getUniqueValues([...existingSubcategories, value]).find(
+            subcategory => subcategory.toLocaleLowerCase() === value.toLocaleLowerCase()
+        ) || value;
+    }
+
     function saveItem() {
         let code = document.getElementById('set-code').value.trim() || ("ITEM_" + Date.now());
-        let cat = document.getElementById('set-cat').value.trim();
-        let sub = document.getElementById('set-sub').value.trim();
+        let cat = getSelectedCategory();
+        let sub = getSelectedSubcategory(cat);
         let name = document.getElementById('set-name').value.trim();
         let price = document.getElementById('set-price').value.trim();
 
@@ -366,8 +471,10 @@
         openSettingsCompanies.add(cat);
         
         document.getElementById('set-code').value = '';
-        document.getElementById('set-cat').value = '';
-        document.getElementById('set-sub').value = '';
+        document.getElementById('set-cat-select').value = '';
+        document.getElementById('set-cat-new').value = '';
+        document.getElementById('set-sub-new').value = '';
+        populateCategoryOptions();
         document.getElementById('set-name').value = '';
         document.getElementById('set-price').value = '';
         document.getElementById('form-title').innerText = "Navi Vastu Umero";
@@ -380,8 +487,20 @@
     function editItem(code) {
         let p = products[code];
         document.getElementById('set-code').value = code;
-        document.getElementById('set-cat').value = p.cat;
-        document.getElementById('set-sub').value = p.sub;
+        populateCategoryOptions(p.cat);
+        let categorySelect = document.getElementById('set-cat-select');
+        if (categorySelect.value !== p.cat) {
+            categorySelect.value = addNewOption;
+            document.getElementById('set-cat-new').value = p.cat;
+            handleCategorySelection();
+        }
+        populateSubcategoryOptions(p.cat, p.sub);
+        let subcategorySelect = document.getElementById('set-sub-select');
+        if (subcategorySelect.value !== p.sub) {
+            subcategorySelect.value = addNewOption;
+            document.getElementById('set-sub-new').value = p.sub;
+            handleSubcategorySelection();
+        }
         document.getElementById('set-name').value = p.name;
         document.getElementById('set-price').value = p.price;
         document.getElementById('form-title').innerText = "Bhav Badlo: " + p.name;
@@ -476,6 +595,7 @@
     }
 
     window.onload = () => {
+        populateCategoryOptions();
         renderGrid();
     };
 </script>
