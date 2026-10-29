@@ -53,7 +53,9 @@
         label { font-size: 14px; font-weight: bold; color: #333; }
         .btn-save { width: 100%; padding: 14px; background: #2e7d32; color: white; font-size: 18px; border: none; border-radius: 8px; font-weight: bold; margin-top: 5px; cursor: pointer; }
         .setting-list-item { background: white; padding: 10px; margin-bottom: 8px; border-radius: 6px; border: 1px solid #ddd; }
-        .setting-del-btn { background: #d32f2f; color: white; padding: 6px 12px; border: none; border-radius: 4px; float: right; font-weight: bold; margin-top: -5px; }
+        .setting-action-btn { color: white; padding: 6px 10px; border: none; border-radius: 4px; float: right; font-weight: bold; margin-left: 5px; margin-top: -5px; cursor: pointer; }
+        .btn-del { background: #d32f2f; }
+        .btn-edit { background: #0277bd; }
     </style>
 </head>
 <body>
@@ -87,7 +89,7 @@
 <!-- SECTION 2: SETTINGS (ADD/EDIT ITEMS) -->
 <div id="settings-section" class="section">
     <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h3 style="margin-top: 0;">Navi Vastu Umero / Bhav Badlo</h3>
+        <h3 style="margin-top: 0;" id="form-title">Navi Vastu Umero</h3>
         
         <label>Barcode (Scan karva mate, loose item mate khali rakho):</label>
         <input type="text" id="set-code" placeholder="Barcode number">
@@ -104,7 +106,7 @@
         <label>Price (₹):</label>
         <input type="number" id="set-price" placeholder="Bhav lakho">
         
-        <button class="btn-save" onclick="saveItem()">💾 Save Vastu</button>
+        <button class="btn-save" onclick="saveItem()">💾 Save / Update Vastu</button>
     </div>
 
     <h3 style="margin-top: 20px;">Save Kareli Vastu List:</h3>
@@ -154,14 +156,12 @@
         let items = Object.values(products);
 
         if (!currentCat) {
-            // Level 1: Show Categories
             navBar.style.display = 'none';
             let categories = [...new Set(items.map(p => p.cat))];
             categories.forEach(cat => {
                 grid.innerHTML += `<div class="grid-item" onclick="goCategory('${cat}')">${cat}</div>`;
             });
         } else if (!currentSub) {
-            // Level 2: Show Sub Categories
             navBar.style.display = 'flex';
             navTitle.innerText = currentCat;
             let subCats = [...new Set(items.filter(p => p.cat === currentCat).map(p => p.sub))];
@@ -169,7 +169,6 @@
                 grid.innerHTML += `<div class="grid-item" onclick="goSubCategory('${sub}')">${sub}</div>`;
             });
         } else {
-            // Level 3: Show Products
             navBar.style.display = 'flex';
             navTitle.innerText = `${currentCat} > ${currentSub}`;
             let prods = Object.keys(products).filter(k => products[k].cat === currentCat && products[k].sub === currentSub);
@@ -284,7 +283,7 @@
                 (decodedText) => {
                     if (isScanningPaused) return;
                     isScanningPaused = true;
-                    setTimeout(() => { isScanningPaused = false; }, 1500); // 1.5s delay prevent double scan
+                    setTimeout(() => { isScanningPaused = false; }, 1500);
                     addToBill(decodedText);
                 }, (err) => {}
             ).then(() => { isScannerOn = true; }).catch(err => {
@@ -311,12 +310,26 @@
         localStorage.setItem('pos_products', JSON.stringify(products));
         
         document.getElementById('set-code').value = '';
+        document.getElementById('set-cat').value = '';
+        document.getElementById('set-sub').value = '';
         document.getElementById('set-name').value = '';
         document.getElementById('set-price').value = '';
+        document.getElementById('form-title').innerText = "Navi Vastu Umero";
         
-        alert("✅ Vastu Save Thai Gai!");
+        alert("✅ Vastu Save/Update Thai Gai!");
         renderSettingsList();
         renderGrid();
+    }
+
+    function editItem(code) {
+        let p = products[code];
+        document.getElementById('set-code').value = code;
+        document.getElementById('set-cat').value = p.cat;
+        document.getElementById('set-sub').value = p.sub;
+        document.getElementById('set-name').value = p.name;
+        document.getElementById('set-price').value = p.price;
+        document.getElementById('form-title').innerText = "Bhav Badlo: " + p.name;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function deleteItem(code) {
@@ -335,7 +348,8 @@
             let p = products[code];
             list.innerHTML += `
                 <div class="setting-list-item">
-                    <button class="setting-del-btn" onclick="deleteItem('${code}')">Delete</button>
+                    <button class="setting-action-btn btn-del" onclick="deleteItem('${code}')">Delete</button>
+                    <button class="setting-action-btn btn-edit" onclick="editItem('${code}')">Edit</button>
                     <strong>${p.name}</strong> - ₹${p.price}<br>
                     <small style="color:gray;">${p.cat} > ${p.sub} | Code: ${code}</small>
                 </div>`;
@@ -355,7 +369,7 @@
             document.getElementById('settings-section').classList.add('active');
             document.getElementById('bottom-bar').style.display = 'none';
             renderSettingsList();
-            if (isScannerOn) toggleScanner(); // Turn off scanner when entering settings
+            if (isScannerOn) toggleScanner(); 
         }
     }
 
