@@ -113,6 +113,17 @@
         
         <label>Vastu Nu Naam + Vajan/Rupee (e.g. Mori Wafers ₹5):</label>
         <input type="text" id="set-name" placeholder="Puru naam lakho">
+
+        <label>Customer aa vastu kevi rite mange?</label>
+        <select id="set-filter-type" onchange="handleProductFilterType()">
+            <option value="rate">Rate thi (₹ pramane)</option>
+            <option value="weight">Vajan / size thi (gram, kg, ml, liter)</option>
+        </select>
+
+        <div id="set-weight-container" style="display: none;">
+            <label>Pack nu vajan / size (e.g. 250g, 1kg, 500ml):</label>
+            <input type="text" id="set-weight" placeholder="Vajan ke size lakho">
+        </div>
         
         <label>Price (₹):</label>
         <input type="number" id="set-price" placeholder="Bhav lakho">
@@ -152,6 +163,8 @@
     // Navigation State
     let currentCat = null;
     let currentSub = null;
+    let currentFilterType = null;
+    let currentFilterValue = null;
 
     let html5QrCode;
     let isScannerOn = false;
@@ -183,10 +196,55 @@
             subCats.forEach(sub => {
                 grid.innerHTML += `<div class="grid-item" onclick="goSubCategory('${sub}')">${sub}</div>`;
             });
-        } else {
+        } else if (!currentFilterType) {
             navBar.style.display = 'flex';
             navTitle.innerText = `${currentCat} > ${currentSub}`;
+            const subcategoryProducts = Object.values(products)
+                .filter(product => product.cat === currentCat && product.sub === currentSub);
+            const productTypes = [...new Set(subcategoryProducts.map(getProductFilterType))];
+            productTypes.forEach(type => {
+                const label = type === 'rate' ? '💰 Rate pramane (₹)' : '⚖️ Vajan / size pramane';
+                const filterCard = document.createElement('div');
+                filterCard.className = 'grid-item';
+                filterCard.textContent = label;
+                filterCard.addEventListener('click', () => selectProductFilter(type));
+                grid.append(filterCard);
+            });
+        } else if (currentFilterValue === null) {
+            navBar.style.display = 'flex';
+            const filterLabel = currentFilterType === 'rate' ? 'Rate' : 'Vajan / Size';
+            navTitle.innerText = `${currentCat} > ${currentSub} > ${filterLabel}`;
+            const subcategoryProducts = Object.values(products)
+                .filter(product => product.cat === currentCat
+                    && product.sub === currentSub
+                    && getProductFilterType(product) === currentFilterType);
+            const values = [...new Set(subcategoryProducts.map(product =>
+                currentFilterType === 'rate' ? Number(product.price) : getProductWeight(product)
+            ).filter(value => currentFilterType === 'rate' ? Number.isFinite(value) : Boolean(value)))];
+            values.sort((first, second) => currentFilterType === 'rate'
+                ? first - second
+                : first.localeCompare(second, undefined, { numeric: true, sensitivity: 'base' }));
+            values.forEach(value => {
+                const label = currentFilterType === 'rate' ? `₹${value}` : value;
+                const filterCard = document.createElement('div');
+                filterCard.className = 'grid-item';
+                filterCard.textContent = label;
+                filterCard.addEventListener('click', () => selectFilterValue(value));
+                grid.append(filterCard);
+            });
+        } else {
+            navBar.style.display = 'flex';
+            const filterLabel = currentFilterType === 'rate' ? `₹${currentFilterValue}` : currentFilterValue;
+            navTitle.innerText = `${currentCat} > ${currentSub} > ${filterLabel}`;
             let prods = Object.keys(products).filter(k => products[k].cat === currentCat && products[k].sub === currentSub);
+            prods = prods.filter(key => {
+                const product = products[key];
+                const productValue = currentFilterType === 'rate'
+                    ? Number(product.price)
+                    : getProductWeight(product);
+                return getProductFilterType(product) === currentFilterType
+                    && productValue === currentFilterValue;
+            });
             prods.forEach(key => {
                 let p = products[key];
                 grid.innerHTML += `
@@ -200,8 +258,19 @@
 
     function goCategory(cat) { currentCat = cat; renderGrid(); }
     function goSubCategory(sub) { currentSub = sub; renderGrid(); }
+    function selectProductFilter(type) {
+        currentFilterType = type;
+        currentFilterValue = null;
+        renderGrid();
+    }
+    function selectFilterValue(value) {
+        currentFilterValue = currentFilterType === 'rate' ? Number(value) : value;
+        renderGrid();
+    }
     function goBack() {
-        if (currentSub) { currentSub = null; }
+        if (currentFilterValue !== null) { currentFilterValue = null; }
+        else if (currentFilterType) { currentFilterType = null; }
+        else if (currentSub) { currentSub = null; }
         else if (currentCat) { currentCat = null; }
         renderGrid();
     }
@@ -278,7 +347,7 @@
         if (Object.keys(currentBill).length > 0 && confirm("Navu bill banavvu che? Juno hisab bhusai jashe.")) {
             currentBill = {};
             renderBill();
-            currentCat = null; currentSub = null; renderGrid(); // go to home
+            currentCat = null; currentSub = null; currentFilterType = null; currentFilterValue = null; renderGrid(); // go to home
         }
     }
 
@@ -357,6 +426,23 @@
     }
 
     // --- SETTINGS / ADMIN LOGIC ---
+    function getProductWeight(product) {
+        if (product.weight) return product.weight.trim();
+        const match = product.name.match(/\b\d+(?:\.\d+)?\s*(?:kg|kgs|g|gm|gms|ml|ltr|litre|liter|l)\b/i);
+        return match ? match[0].replace(/\s+/g, '').toLowerCase() : '';
+    }
+
+    function getProductFilterType(product) {
+        if (product.filterType === 'weight' || product.filterType === 'rate') return product.filterType;
+        return getProductWeight(product) ? 'weight' : 'rate';
+    }
+
+    function handleProductFilterType() {
+        const isWeightBased = document.getElementById('set-filter-type').value === 'weight';
+        document.getElementById('set-weight-container').style.display = isWeightBased ? 'block' : 'none';
+        if (!isWeightBased) document.getElementById('set-weight').value = '';
+    }
+
     function getUniqueValues(values) {
         const uniqueValues = new Map();
         values.forEach(value => {
@@ -461,12 +547,16 @@
         let sub = getSelectedSubcategory(cat);
         let name = document.getElementById('set-name').value.trim();
         let price = document.getElementById('set-price').value.trim();
+        let filterType = document.getElementById('set-filter-type').value;
+        let weight = filterType === 'weight'
+            ? document.getElementById('set-weight').value.trim()
+            : '';
 
-        if (!cat || !sub || !name || !price) {
-            alert("Bari vigato bharo! (Category, Sub-cat, Name, Price)"); return;
+        if (!cat || !sub || !name || !price || (filterType === 'weight' && !weight)) {
+            alert("Bari vigato bharo! (Category, Sub-cat, Name, Price ane weight-based vastu mate Vajan/Size)"); return;
         }
 
-        products[code] = { cat, sub, name, price: Number(price) };
+        products[code] = { cat, sub, name, price: Number(price), filterType, weight };
         localStorage.setItem('pos_products', JSON.stringify(products));
         openSettingsCompanies.add(cat);
         
@@ -477,6 +567,9 @@
         populateCategoryOptions();
         document.getElementById('set-name').value = '';
         document.getElementById('set-price').value = '';
+        document.getElementById('set-filter-type').value = 'rate';
+        document.getElementById('set-weight').value = '';
+        handleProductFilterType();
         document.getElementById('form-title').innerText = "Navi Vastu Umero";
         
         alert("✅ Vastu Save/Update Thai Gai!");
@@ -503,6 +596,9 @@
         }
         document.getElementById('set-name').value = p.name;
         document.getElementById('set-price').value = p.price;
+        document.getElementById('set-filter-type').value = getProductFilterType(p);
+        document.getElementById('set-weight').value = getProductWeight(p);
+        handleProductFilterType();
         document.getElementById('form-title').innerText = "Bhav Badlo: " + p.name;
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
