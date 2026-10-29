@@ -1,1 +1,325 @@
 
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>કરિયાણા બિલિંગ એપ</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        * { box-sizing: border-box; font-family: sans-serif; }
+        body { margin: 0; padding: 0; background: #f4f6f9; padding-bottom: 130px; }
+        .header { background: #1b5e20; color: white; padding: 12px; text-align: center; font-size: 22px; font-weight: bold; }
+        .tabs { display: flex; background: #2e7d32; }
+        .tab { flex: 1; padding: 14px; text-align: center; color: white; font-size: 18px; font-weight: bold; cursor: pointer; border-bottom: 4px solid transparent; }
+        .tab.active { background: #1b5e20; border-bottom: 4px solid #ffeb3b; color: #ffeb3b; }
+        .section { display: none; padding: 12px; }
+        .section.active { display: block; }
+        
+        #reader { width: 100%; max-width: 400px; margin: 0 auto; border-radius: 10px; overflow: hidden; background: #000; }
+        
+        /* બિલ લિસ્ટ અને મોટા અક્ષરો */
+        .bill-item { background: white; padding: 12px; margin: 8px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .item-info { flex: 1; }
+        .item-name { font-size: 20px; font-weight: bold; color: #222; }
+        .item-price { font-size: 16px; color: #555; margin-top: 4px; }
+        .qty-controls { display: flex; align-items: center; gap: 8px; }
+        .btn-qty { width: 42px; height: 42px; font-size: 24px; font-weight: bold; border: none; border-radius: 8px; background: #e0e0e0; cursor: pointer; }
+        .btn-qty.plus { background: #c8e6c9; color: #1b5e20; }
+        .btn-qty.minus { background: #ffcdd2; color: #b71c1c; }
+        .qty-num { font-size: 22px; font-weight: bold; min-width: 28px; text-align: center; }
+        .item-total { font-size: 22px; font-weight: bold; color: #1b5e20; min-width: 75px; text-align: right; }
+
+        /* નીચેનું ટોટલ બાર */
+        .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 12px 16px; box-shadow: 0 -3px 10px rgba(0,0,0,0.2); display: flex; justify-content: space-between; align-items: center; border-top: 3px solid #1b5e20; z-index: 100; }
+        .total-box { line-height: 1.3; }
+        .total-items { font-size: 18px; color: #444; font-weight: bold; }
+        .total-amount { font-size: 30px; font-weight: bold; color: #d32f2f; }
+        .btn-clear { background: #d32f2f; color: white; border: none; padding: 14px 20px; font-size: 18px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+
+        /* ફોર્મ અને બટન્સ */
+        input { width: 100%; padding: 14px; margin: 8px 0 16px 0; font-size: 18px; border: 2px solid #ccc; border-radius: 8px; }
+        label { font-size: 18px; font-weight: bold; color: #333; }
+        .btn-main { width: 100%; padding: 15px; background: #1b5e20; color: white; font-size: 20px; border: none; border-radius: 8px; font-weight: bold; margin-top: 8px; cursor: pointer; }
+        .quick-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+        .btn-quick { background: #fff; border: 2px solid #1b5e20; color: #1b5e20; padding: 10px 14px; font-size: 18px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .status-msg { text-align: center; padding: 10px; font-size: 18px; font-weight: bold; border-radius: 8px; margin: 8px 0; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="header">🛒 કરિયાણા બિલિંગ એપ</div>
+
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('bill')">૧. બિલ બનાવો</div>
+    <div class="tab" onclick="switchTab('add')">૨. વસ્તુ ઉમેરો / ભાવ</div>
+</div>
+
+<!-- વિભાગ ૧: બિલ બનાવવા માટે -->
+<div id="bill-section" class="section active">
+    <div id="reader"></div>
+    <div id="scan-status" class="status-msg"></div>
+
+    <div style="margin-top: 12px; font-weight: bold; font-size: 17px; color: #444;">છૂટક વસ્તુઓ (ટચ કરીને ઉમેરો):</div>
+    <div id="quick-list" class="quick-buttons"></div>
+
+    <hr style="border: 1px solid #ddd;">
+    <div id="bill-list"></div>
+</div>
+
+<!-- વિભાગ ૨: નવી વસ્તુ અને ભાવ સેવ કરવા -->
+<div id="add-section" class="section">
+    <button class="btn-main" style="background:#0277bd; margin-bottom: 15px;" onclick="scanForAdd()">📷 બારકોડ સ્કેન કરો</button>
+    
+    <label>બારકોડ નંબર (અથવા છૂટક માટે ખાલી રાખો):</label>
+    <input type="text" id="prod-code" placeholder="સ્કેન કરો અથવા કોડ લખો">
+
+    <label>વસ્તુનું નામ (દા.ત. ખાંડ 1 kg, બાલાજી વેફર):</label>
+    <input type="text" id="prod-name" placeholder="વસ્તુનું નામ લખો">
+
+    <label>ભાવ (રૂપિયામાં):</label>
+    <input type="number" id="prod-price" placeholder="દા.ત. 45">
+
+    <button class="btn-main" onclick="saveProduct()">✅ વસ્તુ સેવ કરો</button>
+
+    <h3 style="margin-top: 25px;">સેવ કરેલી વસ્તુઓનું લિસ્ટ:</h3>
+    <div id="saved-products-list"></div>
+</div>
+
+<!-- નીચેનું કુલ ટોટલ બાર -->
+<div class="bottom-bar" id="bottom-bar">
+    <div class="total-box">
+        <div class="total-items">કુલ વસ્તુ: <span id="total-qty">0</span></div>
+        <div class="total-amount">₹ <span id="total-price">0</span></div>
+    </div>
+    <button class="btn-clear" onclick="clearBill()">નવું બિલ 🔄</button>
+</div>
+
+<script>
+    // શરૂઆતના ડેમો ભાવ (તમે ડિલીટ કે બદલી શકો છો)
+    let defaultProducts = {
+        "LOOSE_SUGAR_1KG": { name: "ખાંડ 1 કિલો", price: 44, isLoose: true },
+        "LOOSE_SUGAR_500G": { name: "ખાંડ 500 ગ્રામ", price: 22, isLoose: true },
+        "LOOSE_OIL_1L": { name: "તેલ 1 લિટર", price: 140, isLoose: true }
+    };
+
+    let products = JSON.parse(localStorage.getItem('kariyana_products')) || defaultProducts;
+    let currentBill = {};
+    let html5QrCode;
+    let scanMode = 'bill';
+    let isScanningPaused = false;
+
+    // બીપ અવાજ કરવા માટે
+    function playBeep() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 1000;
+            osc.type = "sine";
+            osc.start();
+            setTimeout(() => osc.stop(), 150);
+        } catch(e) {}
+    }
+
+    function showStatus(msg, color) {
+        const el = document.getElementById('scan-status');
+        el.style.display = 'block';
+        el.style.background = color;
+        el.style.color = '#fff';
+        el.innerText = msg;
+        setTimeout(() => { el.style.display = 'none'; }, 2000);
+    }
+
+    function startScanner() {
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode("reader");
+        }
+        html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 150 } },
+            (decodedText) => {
+                if (isScanningPaused) return;
+                
+                playBeep();
+                isScanningPaused = true;
+                setTimeout(() => { isScanningPaused = false; }, 1800); // 1.8 સેકન્ડનો પોઝ જેથી બે વાર સ્કેન ન થઈ જાય
+
+                if (scanMode === 'bill') {
+                    addToBill(decodedText);
+                } else if (scanMode === 'add') {
+                    document.getElementById('prod-code').value = decodedText;
+                    switchTab('add', true);
+                    alert("બારકોડ આવી ગયો: " + decodedText + "\nહવે વસ્તુનું નામ અને ભાવ લખો.");
+                }
+            },
+            (errorMessage) => {}
+        ).catch(err => {
+            console.log("કેમેરા ચાલુ કરવામાં સમસ્યા:", err);
+        });
+    }
+
+    function addToBill(code) {
+        if (products[code]) {
+            if (currentBill[code]) {
+                currentBill[code].qty += 1;
+            } else {
+                currentBill[code] = {
+                    name: products[code].name,
+                    price: Number(products[code].price),
+                    qty: 1
+                };
+            }
+            showStatus("✅ " + products[code].name + " (₹" + products[code].price + ")", "#2e7d32");
+            renderBill();
+        } else {
+            showStatus("❌ આ બારકોડ સેવ નથી! પહેલા 'વસ્તુ ઉમેરો' માં સેવ કરો.", "#c62828");
+        }
+    }
+
+    function changeQty(code, delta) {
+        if (currentBill[code]) {
+            currentBill[code].qty += delta;
+            if (currentBill[code].qty <= 0) {
+                delete currentBill[code];
+            }
+            renderBill();
+        }
+    }
+
+    function renderBill() {
+        const list = document.getElementById('bill-list');
+        list.innerHTML = '';
+        let totalQty = 0;
+        let totalPrice = 0;
+
+        for (let code in currentBill) {
+            let item = currentBill[code];
+            let itemTotal = item.qty * item.price;
+            totalQty += item.qty;
+            totalPrice += itemTotal;
+
+            list.innerHTML += `
+                <div class="bill-item">
+                    <div class="item-info">
+                        <div class="item-name">${item.name}</div>
+                        <div class="item-price">ભાવ: ₹${item.price}</div>
+                    </div>
+                    <div class="qty-controls">
+                        <button class="btn-qty minus" onclick="changeQty('${code}', -1)">-</button>
+                        <div class="qty-num">${item.qty}</div>
+                        <button class="btn-qty plus" onclick="changeQty('${code}', 1)">+</button>
+                    </div>
+                    <div class="item-total">₹${itemTotal}</div>
+                </div>
+            `;
+        }
+
+        document.getElementById('total-qty').innerText = totalQty;
+        document.getElementById('total-price').innerText = totalPrice;
+    }
+
+    function clearBill() {
+        if (Object.keys(currentBill).length === 0) return;
+        if (confirm("શું તમારે આ બિલ ભૂંસીને નવું બિલ શરૂ કરવું છે?")) {
+            currentBill = {};
+            renderBill();
+        }
+    }
+
+    function saveProduct() {
+        let code = document.getElementById('prod-code').value.trim();
+        let name = document.getElementById('prod-name').value.trim();
+        let price = document.getElementById('prod-price').value.trim();
+
+        if (!name || !price) {
+            alert("કૃપા કરીને વસ્તુનું નામ અને ભાવ બંને લખો!");
+            return;
+        }
+
+        let isLoose = false;
+        if (!code) {
+            code = "LOOSE_" + Date.now();
+            isLoose = true;
+        }
+
+        products[code] = { name: name, price: Number(price), isLoose: isLoose };
+        localStorage.setItem('kariyana_products', JSON.stringify(products));
+
+        document.getElementById('prod-code').value = '';
+        document.getElementById('prod-name').value = '';
+        document.getElementById('prod-price').value = '';
+
+        alert("✅ " + name + " (₹" + price + ") સેવ થઈ ગઈ!");
+        renderSavedProducts();
+        renderQuickButtons();
+    }
+
+    function deleteProduct(code) {
+        if (confirm("શું આ વસ્તુ કાઢી નાખવી છે?")) {
+            delete products[code];
+            localStorage.setItem('kariyana_products', JSON.stringify(products));
+            renderSavedProducts();
+            renderQuickButtons();
+        }
+    }
+
+    function renderQuickButtons() {
+        const qList = document.getElementById('quick-list');
+        qList.innerHTML = '';
+        for (let code in products) {
+            if (products[code].isLoose) {
+                qList.innerHTML += `<button class="btn-quick" onclick="addToBill('${code}')">+ ${products[code].name} (₹${products[code].price})</button>`;
+            }
+        }
+    }
+
+    function renderSavedProducts() {
+        const sList = document.getElementById('saved-products-list');
+        sList.innerHTML = '';
+        for (let code in products) {
+            sList.innerHTML += `
+                <div class="bill-item">
+                    <div class="item-info">
+                        <div class="item-name">${products[code].name} - ₹${products[code].price}</div>
+                        <div class="item-price">કોડ: ${code}</div>
+                    </div>
+                    <button class="btn-qty minus" style="width:auto; padding:0 12px; font-size:16px;" onclick="deleteProduct('${code}')">ડિલીટ</button>
+                </div>
+            `;
+        }
+    }
+
+    function switchTab(tab, keepCode = false) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+
+        if (tab === 'bill') {
+            scanMode = 'bill';
+            document.querySelectorAll('.tab')[0].classList.add('active');
+            document.getElementById('bill-section').classList.add('active');
+            document.getElementById('bottom-bar').style.display = 'flex';
+        } else {
+            document.querySelectorAll('.tab')[1].classList.add('active');
+            document.getElementById('add-section').classList.add('active');
+            document.getElementById('bottom-bar').style.display = 'none';
+            renderSavedProducts();
+        }
+    }
+
+    function scanForAdd() {
+        scanMode = 'add';
+        switchTab('bill');
+        showStatus("હવે નવી વસ્તુનો બારકોડ કેમેરા સામે રાખો...", "#0277bd");
+    }
+
+    window.onload = () => {
+        renderQuickButtons();
+        startScanner();
+    };
+</script>
+
+</body>
+</html>
